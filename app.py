@@ -41,8 +41,15 @@ if "df_raw" not in st.session_state:
     st.session_state.df_raw = None
 if "priority_filter" not in st.session_state:
     st.session_state.priority_filter = "All"
+if "task_input" not in st.session_state:
+    st.session_state.task_input = ""
 
-# ---------- Input (let Streamlit manage the state via key only) ----------
+# ---------- Clear callback ----------
+def clear_tasks():
+    st.session_state["task_input"] = ""
+    st.session_state["df_raw"] = None
+
+# ---------- Input ----------
 st.text_area(
     "Enter your to-do tasks (one per line):",
     key="task_input",
@@ -51,12 +58,9 @@ st.text_area(
 
 col1, col2 = st.columns([1, 1])
 with col1:
-    analyze_button = st.button("🧠 Analyze Tasks", type="primary")
+    analyze_button = st.button("Analyze Tasks", type="primary")
 with col2:
-    if st.button("🗑️ Clear Tasks"):
-        st.session_state.task_input = ""
-        st.session_state.df_raw = None
-        st.rerun()
+    st.button("Clear Tasks", on_click=clear_tasks)
 
 # ---------- Parse on Analyze ----------
 if analyze_button and st.session_state.task_input.strip():
@@ -76,30 +80,30 @@ if analyze_button and st.session_state.task_input.strip():
     if st.session_state.df_raw is None or st.session_state.df_raw.empty:
         st.info("No valid tasks detected. Please add at least one line.")
     else:
-        st.success("✅ Analysis Complete!", icon="✅")
+        st.success("Analysis Complete!")
 
-# ---------- Render (independent of the Analyze button) ----------
+# ---------- Render ----------
 df_raw = st.session_state.df_raw
 if df_raw is not None and not df_raw.empty:
 
-    # Summary counts (no emojis)
+    # Summary counts
     high_n   = int((df_raw["priority"] == "High").sum())
     medium_n = int((df_raw["priority"] == "Medium").sum())
     low_n    = int((df_raw["priority"] == "Low").sum())
 
-    # Summary chips
+    # Summary chips (no emojis)
     st.markdown(
         f"""
         <div class="chip-bar">
-            <div class="chip chip-high">🔥 High: {high_n}</div>
-            <div class="chip chip-medium">⚡ Medium: {medium_n}</div>
-            <div class="chip chip-low">💤 Low: {low_n}</div>
+            <div class="chip chip-high">High: {high_n}</div>
+            <div class="chip chip-medium">Medium: {medium_n}</div>
+            <div class="chip chip-low">Low: {low_n}</div>
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    # Priority filter (bind directly to session via key; no manual index juggling)
+    # Priority filter
     st.radio(
         "Filter by priority",
         options=["All", "High", "Medium", "Low"],
@@ -108,7 +112,7 @@ if df_raw is not None and not df_raw.empty:
     )
     filter_choice = st.session_state.priority_filter
 
-    # Apply filtering and sort on RAW data
+    # Apply filtering and sort
     if filter_choice == "All":
         df_view = df_raw.copy()
     else:
@@ -118,16 +122,9 @@ if df_raw is not None and not df_raw.empty:
     df_view["__prio"] = df_view["priority"].map(priority_order).fillna(99)
     df_view = df_view.sort_values(["__prio", "task"]).drop(columns="__prio").reset_index(drop=True)
 
-    # Add emoji labels for display only
-    df_display = df_view.copy()
-    df_display["priority"] = df_display["priority"].replace({
-        "High": "🔥 High",
-        "Medium": "⚡ Medium",
-        "Low": "💤 Low"
-    })
+    # Display
+    st.dataframe(df_view, use_container_width=True)
 
-    st.dataframe(df_display, use_container_width=True)
-
-    # CSV of the filtered view (no emojis)
+    # CSV download
     csv = df_view.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download CSV", data=csv, file_name="todo_tasks.csv", mime="text/csv")
+    st.download_button("Download CSV", data=csv, file_name="todo_tasks.csv", mime="text/csv")
