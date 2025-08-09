@@ -66,22 +66,27 @@ if analyze_button and st.session_state.task_input.strip():
 
     task_data = []
     for task in tasks:
-        task_info = {
-            "task": task,
-            "category": "Personal" if "call" in task.lower() else "Errand" if "groceries" in task.lower() else "Work",
-            "priority": "High" if "assignment" in task.lower() or "groceries" in task.lower() else "Medium",
-        }
-        task_data.append(task_info)
+        lower = task.lower()
+        category = "Personal" if "call" in lower else "Errand" if "groceries" in lower else "Work"
+        priority = "High" if ("assignment" in lower or "groceries" in lower) else "Medium"
+        task_data.append({"task": task, "category": category, "priority": priority})
 
-    st.success("✅ Analysis Complete!", icon="✅")
-
+    # Build DF
     df = pd.DataFrame(task_data)
+
+    # --- NEW: sort by priority High → Medium → Low ---
+    priority_order = {"High": 0, "Medium": 1, "Low": 2}
+    df["__prio"] = df["priority"].map(priority_order).fillna(99)
+    df = df.sort_values(["__prio", "task"]).drop(columns="__prio").reset_index(drop=True)
+
+    # Add emoji labels AFTER sorting
     df["priority"] = df["priority"].replace({
         "High": "🔥 High",
         "Medium": "⚡ Medium",
         "Low": "💤 Low"
     })
 
+    st.success("✅ Analysis Complete!", icon="✅")
     st.dataframe(df, use_container_width=True)
 
     # CSV Download
